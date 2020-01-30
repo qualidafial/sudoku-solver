@@ -10,17 +10,17 @@ import (
 
 func main() {
 	s, err := NewSudokuFromString(`
-		 6 | 8 |  1
-		79 |  3|  6
-		4  |62 |9  
+		   |5  | 9 
+		   | 79|   
+		8  |2 4|5  
 		---+---+---
-		   |8  |69 
-		   |541|   
-		 34|  9|   
+		  3|  8|45 
+		  2| 9 |3  
+		 57|3  |6  
 		---+---+---
-		  5| 94|  7
-		1  |3  | 69
-		3  | 7 | 1 
+		  8|6 2|  1
+		   |81 |   
+		 6 |  3|   
 	`)
 	if err != nil {
 		fmt.Println(err)
@@ -31,15 +31,21 @@ func main() {
 	if err = s.Solve(); err != nil {
 		fmt.Println(err)
 		s.PrintBoard()
+		s.PrintMoves()
 	}
 }
 
-type Set map[int]Nothing
+type Set [10]bool
 
-type Nothing struct{}
+type Cell struct {
+	row int
+	col int
+}
 
 var (
-	nothing   = Nothing{}
+	full  = Set{false, true, true, true, true, true, true, true, true, true}
+	empty = Set{false, false, false, false, false, false, false, false, false, false}
+
 	nondigits = regexp.MustCompile(`[^0-9 ]`)
 )
 
@@ -78,34 +84,20 @@ func NewSudokuFromString(board string) (*Sudoku, error) {
 func NewSudoku(board [9][9]int) (*Sudoku, error) {
 	s := &Sudoku{}
 
-	allNumbers := func() map[int]Nothing {
-		return Set{
-			1: nothing,
-			2: nothing,
-			3: nothing,
-			4: nothing,
-			5: nothing,
-			6: nothing,
-			7: nothing,
-			8: nothing,
-			9: nothing,
-		}
-	}
-
 	for row := 0; row < 9; row++ {
 		for col := 0; col < 9; col++ {
-			s.moves[row][col] = allNumbers()
+			s.moves[row][col] = full
 		}
 	}
 
 	for i := 0; i < 9; i++ {
-		s.rows[i] = allNumbers()
-		s.cols[i] = allNumbers()
+		s.rows[i] = full
+		s.cols[i] = full
 	}
 
 	for i := 0; i < 3; i++ {
 		for j := 0; j < 3; j++ {
-			s.squares[i][j] = allNumbers()
+			s.squares[i][j] = full
 		}
 	}
 
@@ -113,7 +105,7 @@ func NewSudoku(board [9][9]int) (*Sudoku, error) {
 		for col := 0; col < 9; col++ {
 			value := board[row][col]
 			if value != 0 {
-				if err := s.playMove(row, col, value); err != nil {
+				if err := s.PlayMove(row, col, value); err != nil {
 					return s, err
 				}
 			}
@@ -126,7 +118,7 @@ func NewSudoku(board [9][9]int) (*Sudoku, error) {
 	return s, nil
 }
 
-func (s *Sudoku) playMove(row int, col int, value int) error {
+func (s *Sudoku) PlayMove(row int, col int, value int) error {
 	if row < 0 || row >= 9 {
 		return fmt.Errorf("Row %d out of bounds", row+1)
 	}
@@ -140,27 +132,28 @@ func (s *Sudoku) playMove(row int, col int, value int) error {
 	if s.board[row][col] != 0 {
 		return fmt.Errorf("Cell %d,%d already contains %d", row+1, col+1, s.board[row][col])
 	}
-	if !contains(s.rows[row], value) {
+	if !s.rows[row][value] {
 		return fmt.Errorf("Row %d already contains %d", row+1, value)
 	}
-	if !contains(s.cols[col], value) {
+	if !s.cols[col][value] {
 		return fmt.Errorf("Col %d already contains %d", col+1, value)
 	}
 	squareRow, squareCol := row/3, col/3
-	if !contains(s.squares[squareRow][squareCol], value) {
+	if !s.squares[squareRow][squareCol][value] {
 		return fmt.Errorf("Square %d,%d already contains %d", squareRow+1, squareCol+1, value)
 	}
-	if !contains(s.moves[row][col], value) {
+	if !s.moves[row][col][value] {
 		return fmt.Errorf("Square %d,%d is not a valid spot for %d", row+1, col+1, value)
 	}
 
 	s.board[row][col] = value
+	s.moves[row][col] = empty
 	s.eliminateMoves(row, 0, row, 8, value)
 	s.eliminateMoves(0, col, 8, col, value)
 	s.eliminateMoves(squareRow*3, squareCol*3, squareRow*3+2, squareCol*3+2, value)
-	delete(s.rows[row], value)
-	delete(s.cols[col], value)
-	delete(s.squares[squareRow][squareCol], value)
+	s.rows[row][value] = false
+	s.cols[col][value] = false
+	s.squares[squareRow][squareCol][value] = false
 
 	return nil
 }
@@ -189,21 +182,50 @@ func (s *Sudoku) PrintBoard() {
 	fmt.Println()
 }
 
+func (s *Sudoku) PrintMoves() {
+	fmt.Println()
+	for row := 0; row < 9; row++ {
+		if row == 3 || row == 6 {
+			fmt.Println("-----------+-----------+-----------")
+		} else if row > 0 {
+			fmt.Println("           |           |           ")
+		}
+
+		for moveRow := 0; moveRow < 3; moveRow++ {
+			for col := 0; col < 9; col++ {
+				if col == 3 || col == 6 {
+					fmt.Print("|")
+				} else if col > 0 {
+					fmt.Print(" ")
+				}
+
+				for value := moveRow*3 + 1; value < moveRow*3+4; value++ {
+					if s.moves[row][col][value] {
+						fmt.Print(value)
+					} else {
+						fmt.Print(" ")
+					}
+				}
+			}
+			fmt.Println()
+		}
+	}
+	fmt.Println()
+}
+
 func (s *Sudoku) Solve() error {
 	moves := 0
 
 	// Cells where only a single move is possible
 	for row := 0; row < 9; row++ {
 		for col := 0; col < 9; col++ {
-			if s.board[row][col] == 0 {
-				if len(s.moves[row][col]) == 1 {
-					for value := range s.moves[row][col] {
-						if err := s.playMove(row, col, value); err != nil {
-							return err
-						}
-						moves++
-						fmt.Println(fmt.Sprintf("Only %d fits at %d,%d", value, row+1, col+1))
+			if len(s.moves[row][col]) == 1 {
+				for value := range s.moves[row][col] {
+					if err := s.PlayMove(row, col, value); err != nil {
+						return err
 					}
+					moves++
+					fmt.Println(fmt.Sprintf("Only %d fits in cell %d,%d", value, row+1, col+1))
 				}
 			}
 		}
@@ -213,21 +235,12 @@ func (s *Sudoku) Solve() error {
 	for squareRow := 0; squareRow < 3; squareRow++ {
 		for squareCol := 0; squareCol < 3; squareCol++ {
 			for value := range s.squares[squareRow][squareCol] {
-				var fittingRows []int
-				var fittingCols []int
-				for row := squareRow * 3; row < squareRow*3+3; row++ {
-					for col := squareCol * 3; col < squareCol*3+3; col++ {
-						if contains(s.moves[row][col], value) {
-							fittingRows = append(fittingRows, row)
-							fittingCols = append(fittingCols, col)
-						}
-					}
-				}
-				if len(fittingRows) == 1 && len(fittingCols) == 1 {
-					row := fittingRows[0]
-					col := fittingCols[0]
-					fmt.Println(fmt.Sprintf("In square %d,%d, the number %d only fits at %d,%d", squareRow+1, squareCol+1, value, col%3+1, row%3+1))
-					if err := s.playMove(row, col, value); err != nil {
+				cells := s.findMoves(squareRow*3, squareCol*3, squareRow*3+2, squareCol*3+2, value)
+
+				if len(cells) == 1 {
+					row, col := cells[0].row, cells[0].col
+					fmt.Println(fmt.Sprintf("In square %d,%d, the number %d only fits in cell %d,%d", squareRow+1, squareCol+1, value, row+1, col+1))
+					if err := s.PlayMove(row, col, value); err != nil {
 						return err
 					}
 					moves++
@@ -239,16 +252,12 @@ func (s *Sudoku) Solve() error {
 	// Rows where a number only fits in one cell
 	for row := 0; row < 9; row++ {
 		for value := range s.rows[row] {
-			var fittingCols []int
-			for col := 0; col < 9; col++ {
-				if contains(s.moves[row][col], value) {
-					fittingCols = append(fittingCols, col)
-				}
-			}
-			if len(fittingCols) == 1 {
-				col := fittingCols[0]
+			cells := s.findMoves(row, 0, row, 8, value)
+
+			if len(cells) == 1 {
+				col := cells[0].col
 				fmt.Println(fmt.Sprintf("In row %d, %d only fits at column %d", row+1, value, col+1))
-				if err := s.playMove(row, col, value); err != nil {
+				if err := s.PlayMove(row, col, value); err != nil {
 					return err
 				}
 				moves++
@@ -259,16 +268,12 @@ func (s *Sudoku) Solve() error {
 	// Columns where a number only fits in one cell
 	for col := 0; col < 9; col++ {
 		for value := range s.cols[col] {
-			var fittingRows []int
-			for row := 0; row < 9; row++ {
-				if contains(s.moves[row][col], value) {
-					fittingRows = append(fittingRows, col)
-				}
-			}
-			if len(fittingRows) == 1 {
-				row := fittingRows[0]
+			cells := s.findMoves(0, col, 8, col, value)
+
+			if len(cells) == 1 {
+				row := cells[0].row
 				fmt.Println(fmt.Sprintf("In column %d, %d only fits at row %d", col+1, value, row+1))
-				if err := s.playMove(row, col, value); err != nil {
+				if err := s.PlayMove(row, col, value); err != nil {
 					return err
 				}
 				moves++
@@ -276,22 +281,15 @@ func (s *Sudoku) Solve() error {
 		}
 	}
 
-	// If a number can only be in one row in a square, the other squares in that row cannot have that number in that row
+	// If a number can only be in one row/col in a square, eliminate the number from that row/col in aligned squares
 	for squareRow := 0; squareRow < 3; squareRow++ {
 		for squareCol := 0; squareCol < 3; squareCol++ {
-			var fittingRows []int
 			for value := range s.squares[squareRow][squareCol] {
-				for row := squareRow * 3; row < squareRow*3+3; row++ {
-					found := false
-					for col := squareCol * 3; col < squareCol*3+3; col++ {
-						found = found || contains(s.moves[row][col], value)
-					}
-					if found {
-						fittingRows = append(fittingRows, row)
-					}
-				}
-				if len(fittingRows) == 1 {
-					row := fittingRows[0]
+				cells := s.findMoves(squareRow*3, squareCol*3, squareRow*3+2, squareCol*3+2, value)
+
+				rows := uniqueRows(cells)
+				if len(rows) == 1 {
+					row := rows[0]
 					changed := s.eliminateMoves(row, 0, row, squareCol*3-1, value)
 					changed += s.eliminateMoves(row, squareCol*3+3, row, 8, value)
 					if changed > 0 {
@@ -299,27 +297,10 @@ func (s *Sudoku) Solve() error {
 						moves++
 					}
 				}
-			}
 
-		}
-	}
-
-	// If a number can only be in one column in a square, the other squares in that column cannot have that number in that column
-	for squareRow := 0; squareRow < 3; squareRow++ {
-		for squareCol := 0; squareCol < 3; squareCol++ {
-			var fittingCols []int
-			for value := range s.squares[squareRow][squareCol] {
-				for col := squareCol * 3; col < squareCol*3+3; col++ {
-					found := false
-					for row := squareRow * 3; row < squareRow*3+3; row++ {
-						found = found || contains(s.moves[row][col], value)
-					}
-					if found {
-						fittingCols = append(fittingCols, col)
-					}
-				}
-				if len(fittingCols) == 1 {
-					col := fittingCols[0]
+				cols := uniqueCols(cells)
+				if len(cols) == 1 {
+					col := cols[0]
 					changed := s.eliminateMoves(0, col, squareRow*3-1, col, value)
 					changed += s.eliminateMoves(squareRow*3+3, col, 8, col, value)
 					if changed > 0 {
@@ -348,11 +329,23 @@ func (s *Sudoku) Solve() error {
 }
 
 func (s *Sudoku) eliminateMove(row, col, value int) bool {
-	if ! contains(s.moves[row][col], value) {
+	if !s.moves[row][col][value] {
 		return false
 	}
-	delete(s.moves[row][col], value)
+	s.moves[row][col][value] = false
 	return true
+}
+
+func (s *Sudoku) findMoves(top, left, bottom, right, value int) []Cell {
+	var result []Cell
+	for row := top; row <= bottom; row++ {
+		for col := left; col <= right; col++ {
+			if s.moves[row][col][value] {
+				result = append(result, Cell{row, col})
+			}
+		}
+	}
+	return result
 }
 
 func (s *Sudoku) eliminateMoves(top, left, bottom, right, value int) int {
@@ -379,7 +372,30 @@ func (s *Sudoku) emptySpaces(top, left, bottom, right int) int {
 	return count
 }
 
-func contains(group Set, value int) bool {
-	_, ok := group[value]
-	return ok
+func uniqueRows(cells []Cell) []int {
+	var rows = empty
+	for _, cell := range cells {
+		rows[cell.row] = true
+	}
+
+	return rows.slice()
+}
+
+func uniqueCols(cells []Cell) []int {
+	var cols = empty
+	for _, cell := range cells {
+		cols[cell.col] = true
+	}
+
+	return cols.slice()
+}
+
+func (s Set) slice() []int {
+	var values []int
+	for val, present := range s {
+		if present {
+			values = append(values, val)
+		}
+	}
+	return values
 }
