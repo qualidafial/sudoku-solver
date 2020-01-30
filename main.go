@@ -219,14 +219,14 @@ func (s *Sudoku) Solve() error {
 	// Cells where only a single move is possible
 	for row := 0; row < 9; row++ {
 		for col := 0; col < 9; col++ {
-			if len(s.moves[row][col]) == 1 {
-				for value := range s.moves[row][col] {
-					if err := s.PlayMove(row, col, value); err != nil {
-						return err
-					}
-					moves++
-					fmt.Println(fmt.Sprintf("Only %d fits in cell %d,%d", value, row+1, col+1))
+			values := s.moves[row][col].slice()
+			if len(values) == 1 {
+				value := values[0]
+				if err := s.PlayMove(row, col, value); err != nil {
+					return err
 				}
+				moves++
+				fmt.Println(fmt.Sprintf("Only %d fits in cell %d,%d", value, row+1, col+1))
 			}
 		}
 	}
