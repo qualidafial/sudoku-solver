@@ -190,6 +190,14 @@ func (s *Sudoku) PlayMove(row int, col int, value int) error {
 	s.cols[col][value] = false
 	s.squares[squareRow][squareCol][value] = false
 
+	for row := 0; row < 9; row++ {
+		for cell := 0; cell < 9; cell++ {
+			if s.board[row][cell] == 0 && s.moves[row][cell] == empty {
+				return fmt.Errorf("No moves left at square %d,%d", row+1, col+1)
+			}
+		}
+	}
+
 	return nil
 }
 
