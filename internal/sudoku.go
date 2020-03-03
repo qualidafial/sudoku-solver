@@ -51,6 +51,7 @@ func NewSudokuFromReader(reader io.Reader) (*Sudoku, error) {
 
 	fmt.Println("Initialized Board")
 	s.PrintBoard()
+	s.PrintMoves()
 
 	return s, err
 }
@@ -391,36 +392,7 @@ func (s *Sudoku) Solve() error {
 		}
 	}
 
-	if len(s.Cells().UnsetOnly()) == 0 {
-		fmt.Println("Solved")
-		s.PrintBoard()
-		return nil
-	}
-
-	if moves > 0 {
-		s.PrintBoard()
-		return s.Solve()
-	}
-
-	//for _, cell := range s.Cells().UnsetOnly() {
-	//	for _, value := range cell.Moves() {
-	//		row := cell.row
-	//		col := cell.col
-	//		log("Guessing number %d in row %d column %d\n", value, row+1, col+1)
-	//
-	//		clone := s.Clone()
-	//		if err := clone.PlayMove(row, col, value); err != nil {
-	//			return err
-	//		}
-	//		if err := clone.Solve(); err != nil {
-	//			log("Bad guess")
-	//			continue
-	//		}
-	//		return nil
-	//	}
-	//}
-
-	// If a group of numbers
+	// Naked permutations
 	for _, group := range s.Groups() {
 		group = group.UnsetOnly()
 		for _, subset := range group.PowerSet() {
@@ -443,10 +415,35 @@ func (s *Sudoku) Solve() error {
 		}
 	}
 
+	if len(s.Cells().UnsetOnly()) == 0 {
+		fmt.Println("Solved")
+		s.PrintBoard()
+		return nil
+	}
+
 	if moves > 0 {
 		s.PrintBoard()
+		s.PrintMoves()
 		return s.Solve()
 	}
+
+	//for _, cell := range s.Cells().UnsetOnly() {
+	//	for _, value := range cell.Moves() {
+	//		row := cell.row
+	//		col := cell.col
+	//		log("Guessing number %d in row %d column %d\n", value, row+1, col+1)
+	//
+	//		clone := s.Clone()
+	//		if err := clone.PlayMove(row, col, value); err != nil {
+	//			return err
+	//		}
+	//		if err := clone.Solve(); err != nil {
+	//			log("Bad guess: %d in row %d column %d\n", value, row+1, col+1)
+	//			continue
+	//		}
+	//		return nil
+	//	}
+	//}
 
 	return errors.New("No solution found")
 }
